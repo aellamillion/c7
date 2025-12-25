@@ -59,7 +59,7 @@ export async function parseArticle(url) {
                 const text = element.text().trim();
                 // Simple heuristic: if text is long enough, assume it's the article
                 if (text.length > 200) {
-                    content = text.replace(/\s+/g, ' ').trim(); // Clean whitespace
+                    content = text.replace(/[ \t]+/g, ' ').replace(/\n\s*\n/g, '\n\n').trim(); // Preserve paragraph breaks
                     break;
                 }
             }
@@ -68,7 +68,7 @@ export async function parseArticle(url) {
         // Fallback if no specific container found: try body but it's messy
         if (!content) {
             $('body').find('script, style, nav, footer, header').remove();
-            content = $('body').text().trim().replace(/\s+/g, ' ').substring(0, 5000); // Limit length
+            content = $('body').text().trim().replace(/[ \t]+/g, ' ').replace(/\n\s*\n/g, '\n\n').substring(0, 10000); // Preserve paragraph breaks, higher limit
         }
 
         return {
@@ -82,6 +82,104 @@ export async function parseArticle(url) {
 
     } catch (error) {
         console.error('Parsing error:', error);
+        return {
+            success: false,
+            error: error.message
+        };
+    }
+}
+
+
+export async function translateArticle(url) {
+    try {
+        const apiKey = process.env.OPENROUTER_API_KEY;
+        if (!apiKey) {
+            throw new Error('OPENROUTER_API_KEY is not defined in environment variables. Please check .env.local');
+        }
+
+        const parseResult = await parseArticle(url);
+
+        if (!parseResult.success) {
+            throw new Error(parseResult.error);
+        }
+
+        const { title, content } = parseResult.data;
+        const textToTranslate = `Title: ${title}\n\nContent: ${content}`.substring(0, 15000); // Limit context window
+
+        const models = [
+            "tngtech/tng-r1t-chimera:free",
+            "google/gemini-2.0-flash-exp:free",
+            "z-ai/glm-4.5-air:free"
+        ];
+
+        let response;
+        let lastError;
+
+        for (const model of models) {
+            try {
+                response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+                    method: "POST",
+                    headers: {
+                        "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        "model": model,
+                        "messages": [
+                            {
+                                "role": "system",
+                                "content": `You are an expert translator and editor. 
+Your task is to translate the provided article from English to Russian and format it as a clean, professional Longread.
+
+STRICT RULES:
+1. FORMATTING: Use high-quality Markdown. Use # for the main title, ## and ### for subheadings. 
+2. STRUCTURE: Detect the logical structure of the text. Reconstruct paragraphs and sections even if the input looks like a blob.
+3. CLEANING: Ignore any remaining web noise (like 'click here', random menu items, or navigation fragments).
+4. STYLE: Use a professional, engaging Russian style. Avoid literal translations; prioritize natural-sounding prose.
+5. NO PLACEHOLDERS: Do not leave any English text unless it's a technical term that should stay in English.
+6. OUTPUT ONLY the Russian Markdown content.`
+                            },
+                            {
+                                "role": "user",
+                                "content": textToTranslate
+                            }
+                        ]
+                    })
+                });
+
+                if (response.status === 429) {
+                    console.log(`Rate limited on ${model}, trying next model...`);
+                    continue;
+                }
+
+                if (!response.ok) {
+                    const errText = await response.text();
+                    lastError = `OpenRouter API error (${model}): ${response.status} - ${errText}`;
+                    continue;
+                }
+
+                // If we got here, we have a successful response
+                break;
+            } catch (err) {
+                lastError = err.message;
+                continue;
+            }
+        }
+
+        if (!response || !response.ok) {
+            throw new Error(lastError || "All models failed or were rate limited");
+        }
+
+        const data = await response.json();
+        const translatedText = data.choices[0]?.message?.content || "Translation failed";
+
+        return {
+            success: true,
+            data: translatedText
+        };
+
+    } catch (error) {
+        console.error('Translation error:', error);
         return {
             success: false,
             error: error.message

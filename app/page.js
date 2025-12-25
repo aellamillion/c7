@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import ReactMarkdown from 'react-markdown';
 
 export default function Home() {
   const [url, setUrl] = useState('');
@@ -21,11 +22,33 @@ export default function Home() {
     try {
       // Import the server action dynamically or use the one we'll import at the top
       // Note: We need to import it at the top level
-      const { parseArticle } = await import('./actions');
-      const response = await parseArticle(url);
+      const { parseArticle, translateArticle } = await import('./actions');
+
+      let response;
+      if (action === 'translate') {
+        response = await translateArticle(url);
+      } else {
+        // Existing logic for other actions (currently just parsing, but we might want to distinguish later)
+        // For now, let's keep the existing flow but if we had specific endpoints for summary/theses we would switch here.
+        // Since the prompt only asked for "Translate", I assume the other buttons might just show the parsed text or similar? 
+        // Wait, the original code only called parseArticle for ALL buttons. 
+        // "3 buttons: «О чем статья?», «Тезисы», «Пост для Telegram»" - checking the code...
+        // The original code: const response = await parseArticle(url); 
+        // It seems the original code didn't actually implement logical difference for "Summary"/"Theses" yet, just parsed.
+        // I will preserve that behavior for the old buttons and add specific behavior for the new one.
+
+        response = await parseArticle(url);
+        // If the user clicked specific existing buttons, you might want to process the text differently, 
+        // but for now I will strictly follow the request to ADD the translation function.
+      }
 
       if (response.success) {
-        setResult(JSON.stringify(response.data, null, 2));
+        // If the response is a string (translation), set it directly
+        // If it's an object (parse results), stringify it for display
+        const displayResult = typeof response.data === 'string'
+          ? response.data
+          : JSON.stringify(response.data, null, 2);
+        setResult(displayResult);
       } else {
         setResult(`❌ Ошибка: ${response.error}`);
       }
@@ -110,6 +133,20 @@ export default function Home() {
                 <div className="absolute inset-0 animate-shimmer"></div>
               )}
             </button>
+
+            <button
+              onClick={() => handleAction('translate')}
+              disabled={loading}
+              className="group relative px-6 py-4 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none overflow-hidden"
+            >
+              <span className="relative z-10 flex items-center justify-center gap-2">
+                <span className="text-xl">🌐</span>
+                <span>Перевести</span>
+              </span>
+              {activeAction === 'translate' && (
+                <div className="absolute inset-0 animate-shimmer"></div>
+              )}
+            </button>
           </div>
 
           {/* Result Display */}
@@ -125,8 +162,8 @@ export default function Home() {
                   <p className="text-white/80 text-lg">Обработка...</p>
                 </div>
               ) : (
-                <div className="text-white/95 whitespace-pre-wrap leading-relaxed text-base sm:text-lg">
-                  {result}
+                <div className="text-white/95 leading-relaxed text-base sm:text-lg markdown-container">
+                  <ReactMarkdown>{result}</ReactMarkdown>
                 </div>
               )}
             </div>

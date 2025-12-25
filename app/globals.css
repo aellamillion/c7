@@ -51,6 +51,7 @@ body {
   0% {
     background-position: -1000px 0;
   }
+
   100% {
     background-position: 1000px 0;
   }
@@ -58,12 +59,55 @@ body {
 
 .animate-shimmer {
   animation: shimmer 2s infinite;
-  background: linear-gradient(
-    to right,
-    transparent 0%,
-    rgba(255, 255, 255, 0.3) 50%,
-    transparent 100%
-  );
+  background: linear-gradient(to right,
+      transparent 0%,
+      rgba(255, 255, 255, 0.3) 50%,
+      transparent 100%);
   background-size: 1000px 100%;
 }
 
+
+/* Markdown Styles */
+.markdown-container h1 {
+  font-size: 1.875rem;
+  font-weight: 800;
+  margin-bottom: 1rem;
+  color: white;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  padding-bottom: 0.5rem;
+}
+
+.markdown-container h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-top: 1.5rem;
+  margin-bottom: 0.75rem;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.markdown-container p {
+  margin-bottom: 1rem;
+}
+
+.markdown-container ul {
+  list-style-type: disc;
+  padding-left: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.markdown-container li {
+  margin-bottom: 0.5rem;
+}
+
+.markdown-container strong {
+  color: #fff;
+  font-weight: 700;
+}
+
+.markdown-container blockquote {
+  border-left: 4px solid rgba(255, 255, 255, 0.3);
+  padding-left: 1rem;
+  font-style: italic;
+  margin: 1rem 0;
+  color: rgba(255, 255, 255, 0.8);
+}
